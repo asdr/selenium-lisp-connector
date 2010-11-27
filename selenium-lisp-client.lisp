@@ -37,8 +37,11 @@
 				    #\/)
 				 (subseq host 0 (1- (length host)))
 			       host))
+
 			   ":"
-			   (format nil "~S" (selenium-port selenium))
+
+			   (format nil "~A" (selenium-port selenium))
+
 			   "/selenium-server/driver/"))
 	(params nil))
     
@@ -47,16 +50,14 @@
 	  (sid (selenium-session-id selenium)))
       (dolist (elt args)
 	(when elt
-	  (push (cons (format nil "~S" i)
-		      elt)
+	  (push (cons (format nil "~A" i)
+		      (format nil "~A" elt))
 		params)
 	  (incf i)))
       (when sid
 	(push (cons "sessionId" sid)
 	      params)))
       
-      
-    
     (multiple-value-bind (body-or-stream
 			  status-code     ;;
 			  headers         ;; we're not 
@@ -80,7 +81,7 @@
 				 ))))
     (when response
       (setf (selenium-session-id selenium)
-	    (subseq response 4)))))
+	    (subseq response 3)))))
 
 (defmethod selenium-stop(selenium)
   (request selenium
@@ -114,8 +115,8 @@
     (format t "~A~%" (selenium-browser selenium1))
     (format t "~A~%" (selenium-ext-js selenium1))
     (selenium-open selenium1 "http://www.google.com/webhp")
-    ;(selenium-wait-for-page-to-load selenium1 5000)
-    ;(selenium-stop selenium1)
+    (selenium-wait-for-page-to-load selenium1 5000)
+    (selenium-stop selenium1)
     ))
 			   
 			   
