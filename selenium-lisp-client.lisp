@@ -95,6 +95,8 @@
 	   "open"
 	   (list url)))
 
+;;name?
+;;daha neler...
 (defmethod selenium-wait-for-page-to-load (selenium timeout)
   (request selenium
 	   "waitForPageToLoad"
