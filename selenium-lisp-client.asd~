@@ -1,0 +1,7 @@
+;;;; selenium-lisp-client.asd
+
+(asdf:defsystem #:selenium-lisp-client
+  :serial t
+  :components ((:file "package")
+               (:file "selenium-lisp-client")))
+

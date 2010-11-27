@@ -1,0 +1,58 @@
+;;;; selenium-lisp-client.lisp
+
+(in-package #:selenium-lisp-client)
+
+(defclass selenium ()
+  ((host :initarg :host
+	 :initform "127.0.0.1"
+	 :accessor selenium-host)
+   (port :initarg :port
+	 :initform 4444
+	 :accessor selenium-port)
+   (session-id :initform nil
+	       :accessor selenium-session-id)))
+
+;(defgeneric request (selenium)
+;  "Sends POST request and collects response from selenium server")
+
+(defmethod request (selenium verb args)
+  (let ((url (concantenate 'string 
+			   "http://"
+			   (selenium-host selenium)
+			   ":"
+			   (selenium-port selenium)
+			   "/selenium-server/driver/"))
+	(params nil))
+    
+    (push (cons "cmd" verb) params)
+    (let ((i 1))
+      (dolist (elt args)
+	(push (cons (format nil "~S" i)
+		    elt)
+	      params)
+	(incf i)))
+    
+    (multiple-value-bind (body-or-stream
+			  status-code
+			  headers
+			  uri
+			  stream
+			  must-close
+			  reason-phrase)
+      (http-request url
+		    :method :post
+		    :parameters params
+		    :content-type "application/x-www-urlencoded; charset=utf-8")
+      
+      body-or-stream)))
+
+(defun start-test ()
+  (let ((test1 (make-instance 'selenium
+			   :host "127.0.0.1"
+			   :port "4444")))
+    (request test1 "getNewBrowserSession" '("*googlechrome" "http://www.google.com/"))))
+			   
+
+
+
+

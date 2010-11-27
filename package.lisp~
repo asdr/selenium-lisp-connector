@@ -1,0 +1,5 @@
+;;;; package.lisp
+
+(defpackage #:selenium-lisp-client
+  (:use #:cl))
+
