@@ -24,83 +24,98 @@
 ;(defgeneric request (selenium)
 ;  "Sends POST request and collects response from selenium server")
 
-(defmethod request (selenium verb args)
-  (let ((url (concatenate 'string 
+
+;;if there is a traling / character
+;;into host string, remove...			  
+(defun eleminate-last-slash (host)
+  (if (char= (car (reverse (coerce host 'list)))
+	     #\/)
+      (subseq host 0 (1- (length host)))
+    host))
+
+
+(defmethod get-request (selenium verb &rest args)
+  (let ((url (concatenate 'string
 			   "http://"
-			   
-			   ;;if there is a traling / character
-			   ;;into host string, remove...
-			   ;;this control shouldnt be here,
-			   ;;TODO: 
-			   (let ((host (selenium-host selenium)))
-			     (if (char= (car (reverse (coerce host 'list)))
-				    #\/)
-				 (subseq host 0 (1- (length host)))
-			       host))
-
+			   (eleminate-last-slash (selenium-host selenium))			   
 			   ":"
-
-			   (format nil "~A" (selenium-port selenium))
-
+			   (format nil "~A" (selenium-port selenium))			   
 			   "/selenium-server/driver/"))
 	(params nil))
+
+    ;debug:
+    ;(format t "ARGS: ~A~%" args)
     
+    ;debug:
+    ;(format t "URL: ~A~%" url)
+
     (push (cons "cmd" verb) params)
     (let ((i 1)
 	  (sid (selenium-session-id selenium)))
       (dolist (elt args)
-	(when elt
 	  (push (cons (format nil "~A" i)
 		      (format nil "~A" elt))
 		params)
-	  (incf i)))
+	  (incf i))
       (when sid
 	(push (cons "sessionId" sid)
 	      params)))
-      
-    (multiple-value-bind (body-or-stream
-			  status-code     ;;
-			  headers         ;; we're not 
-			  uri             ;; using these
-			  stream          ;; right now,
-			  must-close      ;; but we will...
-			  reason-phrase)  ;;
-      (http-request url
-		    :method :post
-		    :parameters params
-		    :content-type "application/x-www-urlencoded; charset=utf-8")
+
+    ;debug:
+    ;(format t "PARAMS: ~A~%" params)
+
+    (multiple-value-bind (body-or-stream status-code headers uri
+			  stream must-close reason-phrase)
+        (http-request url
+		      :method :post
+		      :parameters params
+		      :content-type "application/x-www-urlencoded; charset=utf-8")
+     
       (when (equal (subseq body-or-stream 0 2) "OK")
 	body-or-stream))))
 
+;macro here?
+;dont think so... but how else can i ?
+(defmacro get-string (selenium verb &body args)
+  `(let ((response (get-request ,selenium
+				,verb
+				,@args)))
+    (subseq response 3)))
+
+;;not yet implemented
+(defmethod get-string-array (selenium verb &rest args)
+  nil)
+
 (defmethod selenium-start(selenium)
-  (let ((response (request selenium
-			   "getNewBrowserSession"
-			   (list (selenium-browser selenium)
-				 (selenium-url selenium)
-				 ;(selenium-ext-js selenium)
-				 ))))
+  (let ((response (get-string  selenium
+			       "getNewBrowserSession"
+			       (selenium-browser selenium)
+			       (selenium-url selenium)
+			       (selenium-ext-js selenium))))
     (when response
       (setf (selenium-session-id selenium)
-	    (subseq response 3)))))
+	    response))))
 
 (defmethod selenium-stop(selenium)
-  (request selenium
-	   "testComplete"
-	   nil)
-  (setf (selenium-session-id selenium)
-	nil))
+  (get-request selenium "testComplete")
+  (setf (selenium-session-id selenium) nil))
 
 (defmethod selenium-open(selenium url)
-  (request selenium
-	   "open"
-	   (list url)))
+  (get-request selenium "open" url))
 
 ;;name?
 ;;daha neler...
 (defmethod selenium-wait-for-page-to-load (selenium timeout)
-  (request selenium
-	   "waitForPageToLoad"
-	   (list timeout)))
+  (get-request selenium "waitForPageToLoad" timeout))
+
+(defmethod selenium-type (selenium locator value)
+  (get-request selenium "type" locator value))
+
+(defmethod selenium-click (selenium locator)
+  (get-request selenium "click" locator))
+
+(defmethod selenium-get-title (selenium)
+  (get-request selenium "getTitle"))
 
 
 (defun start-test ()
@@ -117,12 +132,9 @@
     (format t "~A~%" (selenium-browser selenium1))
     (format t "~A~%" (selenium-ext-js selenium1))
     (selenium-open selenium1 "http://www.google.com/webhp")
+    (selenium-type selenium1 "q" "hello world")
+    (selenium-click selenium1 "btnG")
     (selenium-wait-for-page-to-load selenium1 5000)
+    (format t "~A~%" (selenium-get-title selenium1))
     (selenium-stop selenium1)
     ))
-			   
-			   
-
-
-
-
