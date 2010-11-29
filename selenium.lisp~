@@ -1,0 +1,327 @@
+;;;; selenium.lisp
+
+(in-package :selenium)
+
+(defclass selenium ()
+  ((host :initarg :host
+	 :initform "127.0.0.1"
+	 :accessor selenium-host)
+   
+   (port :initarg :port
+	 :initform 4444
+	 :accessor selenium-port)
+   
+   (session-id :initform nil
+	       :accessor selenium-session-id)
+   
+   (browser-command :initarg :browser
+		    :initform "*googlechrome"
+		    :reader selenium-browser)
+   
+   (browser-url :initarg :url
+		:accessor selenium-url
+		:initform "")
+   
+   (extension-js :initarg :ext-js
+		 :accessor selenium-ext-js
+		 :initform "")))
+
+(defgeneric request (selenium verb &rest args)
+  (:documentation "Sends POST request and collects response from selenium server"))
+
+(defgeneric open (selenium url)
+  (:documentation "open"))
+
+;;if there is a traling / character
+;;into host string, remove...			  
+(defun eleminate-last-slash (host)
+  (if (char= (car (reverse (coerce host 'list)))
+	     #\/)
+      (subseq host 0 (1- (length host)))
+    host))
+
+
+(defmethod request (selenium verb &rest args)
+  (let ((url (concatenate 'string
+			   "http://"
+			   (eleminate-last-slash (selenium-host selenium))			   
+			   ":"
+			   (format nil "~A" (selenium-port selenium))			   
+			   "/selenium-server/driver/"))
+	(params nil))
+
+    ;debug:
+    ;(format t "ARGS: ~A~%" args)
+    
+    ;debug:
+    ;(format t "URL: ~A~%" url)
+
+    (push (cons "cmd" verb) params)
+    (let ((i 1)
+	  (sid (selenium-session-id selenium)))
+      (dolist (elt args)
+	  (push (cons (format nil "~A" i)
+		      (format nil "~A" elt))
+		params)
+	  (incf i))
+      (when sid
+	(push (cons "sessionId" sid)
+	      params)))
+
+    ;debug:
+    ;(format t "PARAMS: ~A~%" params)
+
+    (multiple-value-bind (body-or-stream status-code headers uri
+			  stream must-close reason-phrase)
+        (http-request url
+		      :method :post
+		      :parameters params
+		      :content-type "application/x-www-urlencoded; charset=utf-8")
+     
+      (when (equal (subseq body-or-stream 0 2) "OK")
+	body-or-stream))))
+
+;macro here?
+;dont think so... but how else can i ?
+(defmacro get-string (selenium verb &body args)
+  `(let ((response (request ,selenium
+				,verb
+				,@args)))
+    (subseq response 3)))
+
+(defmethod start(selenium)
+  (let ((response (get-string  selenium
+			       "getNewBrowserSession"
+			       (selenium-browser selenium)
+			       (selenium-url selenium)
+			       (selenium-ext-js selenium))))
+    (when response
+      (setf (selenium-session-id selenium)
+	    response))))
+
+(defmethod stop(selenium)
+  (request selenium "testComplete")
+  (setf (selenium-session-id selenium) nil))
+
+(defmethod open((sel selenium) url)
+  (request sel "open" url))
+
+;;name?
+;;daha neler...
+(defmethod wait-for-page-to-load (selenium timeout)
+  (request selenium "waitForPageToLoad" timeout))
+
+(defmethod type (selenium locator value)
+  (request selenium "type" locator value))
+
+(defmethod click (selenium locator)
+  (request selenium "click" locator))
+
+(defmethod double-click (selenium locator)
+  (request selenium "doubleClick" locator))
+
+(defmethod context-menu (selenium locator)
+  (request selenium "contextMenu" locator))
+
+(defmethod click-at (selenium locator coord)
+  (request selenium "clickAt" locator coord))
+
+(defmethod double-click-at (selenium locator coord)
+  (request selenium "doubleClickAt" locator coord))
+
+(defmethod context-menu-at (selenium locator coord)
+  (request selenium "contextMenuAt" locator coord))
+
+(defmethod fire-event (selenium locator event-name)
+  (request selenium "fireEvent" locator event-name))
+
+(defmethod focus (selenium locator)
+  (request selenium "focus" locator))
+
+(defmethod key-press (selenium locator key-sequence)
+  (request selenium "keyPress" locator key-sequence))
+
+(defmethod shift-key-down (selenium)
+  (request selenium "shiftKeyDown"))
+
+(defmethod shift-key-up (selenium)
+  (request selenium "shiftKeyUp"))
+
+(defmethod meta-key-down (selenium)
+  (request selenium "metaKeyDown"))
+
+(defmethod meta-key-up (selenium)
+  (request selenium "metaKeyUp"))
+
+(defmethod alt-key-down (selenium)
+  (request selenium "altKeyDown"))
+
+(defmethod alt-key-up (selenium)
+  (request selenium "altKeyUp"))
+
+(defmethod control-key-down (selenium)
+  (request selenium "controlKeyDown"))
+
+(defmethod control-key-up (selenium)
+  (request selenium "controlKeyUp"))
+
+(defmethod key-down (selenium locator key-sequence)
+  (request selenium "keyDown" locator key-sequence))
+
+(defmethod key-up (selenium locator key-sequence)
+  (request selenium "keyUp" locator key-sequence))
+
+(defmethod mouse-over (selenium locator)
+  (request selenium "mouseOver" locator))
+
+(defmethod mouse-out (selenium locator)
+  (request selenium "mouseOut" locator))
+
+(defmethod mouse-down (selenium locator)
+  (request selenium "mouseDown" locator))
+
+(defmethod mouse-down-right (selenium locator)
+  (request selenium "mouseDownRight" locator))
+
+(defmethod mouse-down-at (selenium locator coord)
+  (request selenium "mouseDownAt" locator coord))
+
+(defmethod mouse-down-right-at (selenium locator coord)
+  (request selenium "mouseDownRightAt" locator coord))
+
+(defmethod mouse-up (selenium locator)
+  (request selenium "mouseUp" locator))
+
+(defmethod mouse-up-right (selenium locator)
+  (request selenium "mouseUpRight" locator))
+
+(defmethod mouse-up-at (selenium locator coord)
+  (request selenium "mouseUpAt" locator coord))
+
+(defmethod mouse-up-right-at (selenium locator coord)
+  (request selenium "mouseUpRightAt" locator coord))
+
+(defmethod mouse-move (selenium locator)
+  (request selenium "mouseMove" locator))
+
+(defmethod mouse-move-at (selenium locator coord)
+  (request selenium "mouseMoveAt" locator coord))
+
+(defmethod type-keys (selenium locator value)
+  (request selenium "typeKeys" locator value))
+
+(defmethod set-speed (selenium value)
+  (request selenium "setSpeed" value))
+
+(defmethod get-speed (selenium)
+  (request selenium "getSpeed"))
+
+(defmethod check (selenium locator)
+  (request selenium "check" locator))
+
+(defmethod uncheck (selenium locator)
+  (request selenium "uncheck" locator))
+
+(defmethod select (selenium select-locator option-locator)
+  (request selenium "select" select-locator option-locator))
+
+(defmethod add-selection (selenium locator option-locator)
+  (request selenium "addSelection" locator option-locator))
+
+(defmethod remove-selection (selenium locator option-locator)
+  (request selenium "removeSelection" locator option-locator))
+
+(defmethod remove-all-selections (selenium locator)
+  (request selenium "removeAllSelections" locator))
+
+(defmethod submit (selenium form-locator)
+  (request selenium "submit" form-locator))
+
+(defmethod open-window (selenium url window-id)
+  (request selenium "openWindow" url window-id))
+
+(defmethod select-window (selenium window-id)
+  (request selenium "selectWindow" window-id))
+
+(defmethod select-pop-up (selenium window-id)
+  (request selenium "selectPopUp" window-id))
+
+(defmethod deselect-pop-up (selenium)
+  (request selenium "deselectPopUp"))
+
+(defmethod select-frame (selenium locator)
+  (request selenium "selectFrame" locator))
+
+(defmethod wait-for-pop-up (selenium window-id timeout)
+  (request selenium "waitForPopUp" window-id timeout))
+
+(defmethod choose-cancel-on-next-confirmation (selenium)
+  (request selenium "chooseCancelOnNextConfirmation"))
+
+(defmethod choose-ok-on-next-confirmation (selenium)
+  (request selenium "chooseOkOnNextConfirmation"))
+
+(defmethod answer-on-next-prompt (selenium answer)
+  (request selenium "answerOnNextPrompt" answer))
+
+(defmethod go-back (selenium)
+  (request selenium "goBack"))
+
+(defmethod refresh (selenium)
+  (request selenium "refresh"))
+
+(defmethod close (selenium)
+  (request selenium "close"))
+
+(defmethod alert-present? (selenium)
+  (get-string selenium "isAlertPresent"))
+
+(defmethod prompt-present? (selenium)
+  (get-string selenium "isPromptPresent"))
+
+(defmethod confirmation-present? (selenium)
+  (get-string selenium "isConfirmationPresent"))
+
+(defmethod get-alert (selenium)
+  (get-string selenium "getAlert"))
+
+(defmethod get-confirmation (selenium)
+  (get-string selenium "getConfirmation"))
+
+(defmethod get-prompt (selenium)
+  (get-string selenium "getPrompt"))
+
+(defmethod get-location (selenium)
+  (get-string selenium "getLocation"))
+
+(defmethod get-title (selenium)
+  (get-string selenium "getTitle"))
+
+(defmethod get-body-text (selenium)
+  (get-string selenium "getBodyText"))
+
+(defmethod get-value (selenium locator)
+  (get-string selenium "getValue" locator))
+
+
+
+
+(defun start-test ()
+  (let ((selenium1 (make-instance 'selenium
+			   :host "127.0.0.1/"
+			   :port 4444
+			   :url "http://www.google.com/")))
+    
+    (start selenium1)
+    (format t "~A~%" (selenium-host selenium1))
+    (format t "~A~%" (selenium-port selenium1))
+    (format t "~A~%" (selenium-url selenium1))
+    (format t "~A~%" (selenium-session-id selenium1))
+    (format t "~A~%" (selenium-browser selenium1))
+    (format t "~A~%" (selenium-ext-js selenium1))
+    (open selenium1 "http://www.google.com/webhp")
+    (type selenium1 "q" "hello world")
+    (click selenium1 "btnG")
+    (wait-for-page-to-load selenium1 5000)
+    (format t "~A~%" (get-title selenium1))
+    (stop selenium1)))

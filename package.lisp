@@ -1,11 +1,12 @@
 ;;;; package.lisp
 
-(defpackage #:selenium-lisp-client
+(defpackage #:selenium
   (:use #:cl #:drakma)
-  (:export #:selenium-start
-	   #:selenium-stop
-	   #:selenium-open
-	   #:selenium-type
-	   #:selenium-click
+  (:export #:start
+	   #:stop
+	   #:open
+	   #:type
+	   #:click
 	   #:start-test))
 
+(in-package :selenium)
