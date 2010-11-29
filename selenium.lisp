@@ -270,7 +270,7 @@
 (defmethod refresh ((sel selenium))
   (request sel "refresh"))
 
-(defmethod close-popup ((sel selenium))
+(defmethod close-pop-up ((sel selenium))
   (request sel "close"))
 
 (defmethod alert-present? ((sel selenium))
