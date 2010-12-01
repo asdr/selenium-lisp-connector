@@ -56,12 +56,6 @@
 			   "/selenium-server/driver/"))
 	(params nil))
 
-    ;debug:
-    ;(format t "ARGS: ~A~%" args)
-    
-    ;debug:
-    ;(format t "URL: ~A~%" url)
-
     (push (cons "cmd" verb) params)
     (let ((i 1)
 	  (sid (selenium-session-id selenium)))
@@ -73,9 +67,6 @@
       (when sid
 	(push (cons "sessionId" sid)
 	      params)))
-
-    ;debug:
-    ;(format t "PARAMS: ~A~%" params)
 
     (multiple-value-bind (body-or-stream status-code headers uri
 			  stream must-close reason-phrase)
