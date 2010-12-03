@@ -68,16 +68,15 @@
 	*extension-js* ext-js))
 
 (defmacro  with-new-session ((host port browser url ext-js) &body body)
-  `(funcall #'(lambda ()
-		(let ((*selenium-host* ,host)
-		      (*selenium-port* ,port)
-		      (*session-id* nil)
-		      (*browser* ,browser)
-		      (*startup-url* ,url)
-		      (*extension-js* ,ext-js))
-		  (session-start)
-		  ,@body
-		  (session-stop)))))
+  `(let ((*selenium-host* ,host)
+	 (*selenium-port* ,port)
+	 (*session-id* nil)
+	 (*browser* ,browser)
+	 (*startup-url* ,url)
+	 (*extension-js* ,ext-js))
+     (session-start)
+     ,@body
+     (session-stop)))
 
 (defun session-start(&key (browser *browser*)
 			  (url *startup-url*)
