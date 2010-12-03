@@ -528,11 +528,7 @@
   (request "keyPressNative" keycode))
 
 (defun test1 ()
-  (with-new-session (:host "localhost" 
-		     :port 4444
-		     :browser "*googlechrome"
-		     :url "http://www.google.com"
-		     :ext-js "")
+  (with-new-session (:url "http://www.google.com")
     (open-page "http://www.goole.com")
     (type-string "q" "hello world")
     (click "btnG")
