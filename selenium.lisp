@@ -83,11 +83,17 @@
      ,@body
      (if (null ,persist)
 	 (session-stop)
-       (setf *selenium-host* ,host
-	     *selenium-port* ,port
-	     *browser* ,browser
-	     *startup-url* ,url
-	     *extension-js* ,ext-js))))
+       (progn
+	 (declare (special *selenium-host*))
+	 (declare (special *selenium-port*))
+	 (declare (special *browser*))
+	 (declare (special *startup-url*))
+	 (declare (special *extension-js*))
+	 (setf *selenium-host* ,host
+	       *selenium-port* ,port
+	       *browser* ,browser
+	       *startup-url* ,url
+	       *extension-js* ,ext-js)))))
 
 (defun session-start(&key (browser *browser*)
 			  (url *startup-url*)
