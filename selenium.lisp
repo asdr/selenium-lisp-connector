@@ -524,26 +524,13 @@
 (defun key-press-native (keycode)
   (request "keyPressNative" keycode))
 
-(defun start-test ()
-  (let ((selenium1 (make-instance 'selenium
-				  :host "localhost" 
-				  :port 4444
-				  :url "http://www.milliyet.com.tr/")))
-    
-    (session-start selenium1)
-    (open-page selenium1 "http://www.milliyet.com.tr")
-    (type-string selenium1 "q" "hello world")
-    (click selenium1 "btnG")
-    (wait-for-page-to-load selenium1 5000)
-    (format t "~A~%" (get-title selenium1))
-    (session-stop selenium1)))
-
-(defun test1(selenium)
-  "returns a test method"
-  (lambda ()
-    (open-page selenium "http://www.google.com/")
-    (type-string selenium "q" "hello world")
-    (click selenium "btnG")
-    (wait-for-page-to-load selenium 5000)
-    (format t "~A~%" (get-title selenium))
-    (session-stop selenium)))
+(defun test1 ()
+  (with-new-session ("localhost" 
+		     4444
+		     "*googlechrome"
+		     "http://www.milliyet.com.tr/")
+    (open-page "http://www.milliyet.com.tr")
+    (type-string "q" "hello world")
+    (click "btnG")
+    (wait-for-page-to-load 5000)
+    (format t "~A~%" (get-title))))

@@ -2,12 +2,14 @@
 
 (defpackage #:selenium
   (:use #:cl #:drakma)
-  (:export #:session-start
+  (:export #:with-new-session
+	   #:session-setup
+	   #:session-start
 	   #:session-stop
 	   #:open-page
 	   #:type-string
 	   #:click
-	   #:start-test
+	   #:test1
 	   #:wait-for-page-to-load
 	   #:double-click
 	   #:context-menu
