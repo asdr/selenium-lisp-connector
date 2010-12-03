@@ -67,7 +67,11 @@
 	*startup-url* url
 	*extension-js* ext-js))
 
-(defmacro  with-new-session ((host port browser url ext-js) &body body)
+(defmacro  with-new-session ((&key (host *selenium-host*) 
+				   (port *selenium-port*) 
+				   (browser *browser*)
+				   (url *startup-url*)
+				   (ext-js *extension-js*)) &body body)
   `(let ((*selenium-host* ,host)
 	 (*selenium-port* ,port)
 	 (*session-id* nil)
@@ -524,11 +528,12 @@
   (request "keyPressNative" keycode))
 
 (defun test1 ()
-  (with-new-session ("localhost" 
-		     4444
-		     "*googlechrome"
-		     "http://www.milliyet.com.tr/")
-    (open-page "http://www.milliyet.com.tr")
+  (with-new-session (:host "localhost" 
+		     :port 4444
+		     :browser "*googlechrome"
+		     :url "http://www.google.com"
+		     :ext-js "")
+    (open-page "http://www.goole.com")
     (type-string "q" "hello world")
     (click "btnG")
     (wait-for-page-to-load 5000)
