@@ -71,7 +71,8 @@
 				   (port *selenium-port*) 
 				   (browser *browser*)
 				   (url *startup-url*)
-				   (ext-js *extension-js*)) &body body)
+				   (ext-js *extension-js*)
+				   (persist nil)) &body body)
   `(let ((*selenium-host* ,host)
 	 (*selenium-port* ,port)
 	 (*session-id* nil)
@@ -80,7 +81,13 @@
 	 (*extension-js* ,ext-js))
      (session-start)
      ,@body
-     (session-stop)))
+     (if (null ,persist)
+	 (session-stop)
+       (setf *selenium-host* ,host
+	     *selenium-port* ,port
+	     *browser* ,browser
+	     *startup-url* ,url
+	     *extension-js* ,ext-js))))
 
 (defun session-start(&key (browser *browser*)
 			  (url *startup-url*)
