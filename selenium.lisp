@@ -2,35 +2,12 @@
 
 (in-package :selenium)
 
-(defclass selenium ()
-  ((host :initarg :host
-	 :initform "127.0.0.1"
-	 :accessor selenium-host)
-   
-   (port :initarg :port
-	 :initform 4444
-	 :accessor selenium-port)
-   
-   (session-id :initform nil
-	       :accessor selenium-session-id)
-   
-   (browser-command :initarg :browser
-		    :initform "*googlechrome"
-		    :reader selenium-browser)
-   
-   (browser-url :initarg :url
-		:accessor selenium-url
-		:initform "")
-   
-   (extension-js :initarg :ext-js
-		 :accessor selenium-ext-js
-		 :initform "")))
-
-(defgeneric request (selenium verb &rest args)
-  (:documentation "Sends POST request and collects response from selenium server"))
-
-(defgeneric open-page (selenium url)
-  (:documentation "open"))
+(defvar *selenium-host* "localhost")
+(defvar *selenium-port* 4444)
+(defvar *session-id* nil)
+(defvar *browser* "*googlechrome")
+(defvar *startup-url* nil)
+(defvar *extension-js* nil)
 
 ;;if there is a traling / character
 ;;into host string, remove...			  
@@ -47,489 +24,505 @@
       (cons (subseq string start p1)
 	          (split-string string :ch ch :start (1+ p1))))))
 
-(defmethod request (selenium verb &rest args)
+(defun request (verb &rest args)
   (let ((url (concatenate 'string
-			   "http://"
-			   (eleminate-last-slash (selenium-host selenium))			   
-			   ":"
-			   (format nil "~A" (selenium-port selenium))			   
-			   "/selenium-server/driver/"))
+			  "http://"
+			  (eleminate-last-slash *selenium-host*)	   
+			  ":"
+			  (format nil "~A" *selenium-port*)		   
+			  "/selenium-server/driver/"))
 	(params nil))
-
+    
     (push (cons "cmd" verb) params)
-    (let ((i 1)
-	  (sid (selenium-session-id selenium)))
+    (let ((i 1))
       (dolist (elt args)
-	  (push (cons (format nil "~A" i)
-		      (format nil "~A" elt))
-		params)
-	  (incf i))
-      (when sid
-	(push (cons "sessionId" sid)
+	(push (cons (format nil "~A" i)
+		    (format nil "~A" elt))
+	      params)
+	(incf i))
+      (when *session-id*
+	(push (cons "sessionId" *session-id*)
 	      params)))
 
-    (multiple-value-bind (body-or-stream status-code headers uri
-			  stream must-close reason-phrase)
-        (http-request url
-		      :method :post
-		      :parameters params
-		      :content-type "application/x-www-urlencoded; charset=utf-8")
-     
-      (when (equal (subseq body-or-stream 0 2) "OK")
-	body-or-stream))))
+    (let ((body-or-stream (http-request url
+					:method :post
+					:parameters params
+					:content-type "application/x-www-urlencoded; charset=utf-8")))
+      (if (equal (subseq body-or-stream 0 2) "OK")
+	  body-or-stream
+	(format t "~A" body-or-stream)))))
 
 ;macro here?
 ;dont think so... but how else can i ?
-(defmacro get-string (selenium verb &body args)
-  `(let ((response (request ,selenium
-			    ,verb
+(defmacro get-string (verb &body args)
+  `(let ((response (request ,verb
 			    ,@args)))
      (subseq response 3)))
 
-(defmethod session-start((sel selenium))
-  (let ((response (get-string  sel
-			       "getNewBrowserSession"
-			       (selenium-browser sel)
-			       (selenium-url sel)
-			       (selenium-ext-js sel))))
+(defun session-setup (&key host port browser url ext-js)
+  (setf *selenium-host* host
+	*selenium-port* port
+	*session-id* nil
+	*browser* browser
+	*startup-url* url
+	*extension-js* ext-js))
+
+(defmacro  with-new-session ((host port browser url ext-js) &body body)
+  `(funcall #'(lambda ()
+		(let ((*selenium-host* ,host)
+		      (*selenium-port* ,port)
+		      (*session-id* nil)
+		      (*browser* ,browser)
+		      (*startup-url* ,url)
+		      (*extension-js* ,ext-js))
+		  (session-start)
+		  ,@body
+		  (session-stop)))))
+
+(defun session-start(&key (browser *browser*)
+			  (url *startup-url*)
+			  (ext-js *extension-js*))
+  (let ((response (get-string  "getNewBrowserSession"
+			       browser
+			       url
+			       ext-js)))
     (when response
-      (setf (selenium-session-id sel)
-	    response))))
+      (setf *session-id* response))))
 
-(defmethod session-stop((sel selenium))
-  (request sel "testComplete")
-  (setf (selenium-session-id sel) nil))
+(defun session-stop()
+  (request "testComplete")
+  (setf *session-id* nil))
 
-(defmethod open-page((sel selenium) url)
-  (request sel "open" url))
+(defun open-page(url)
+  (request "open" url))
 
 ;;name?
 ;;daha neler...
-(defmethod wait-for-page-to-load ((sel selenium) timeout)
-  (request sel "waitForPageToLoad" timeout))
+(defun wait-for-page-to-load (timeout)
+  (request "waitForPageToLoad" timeout))
 
-(defmethod type-string ((sel selenium) locator value)
-   (request sel "type" locator value))
+(defun type-string (locator value)
+   (request "type" locator value))
 
-(defmethod click ((sel selenium) locator)
-  (request sel "click" locator))
+(defun click (locator)
+  (request "click" locator))
 
-(defmethod double-click ((sel selenium) locator)
-  (request sel "doubleClick" locator))
+(defun double-click (locator)
+  (request "doubleClick" locator))
 
-(defmethod context-menu ((sel selenium) locator)
-  (request sel "contextMenu" locator))
+(defun context-menu (locator)
+  (request "contextMenu" locator))
 
-(defmethod click-at ((sel selenium) locator coord)
-  (request sel "clickAt" locator coord))
+(defun click-at (locator coord)
+  (request "clickAt" locator coord))
 
-(defmethod double-click-at ((sel selenium) locator coord)
-  (request sel "doubleClickAt" locator coord))
+(defun double-click-at (locator coord)
+  (request "doubleClickAt" locator coord))
 
-(defmethod context-menu-at ((sel selenium) locator coord)
-  (request sel "contextMenuAt" locator coord))
+(defun context-menu-at (locator coord)
+  (request "contextMenuAt" locator coord))
 
-(defmethod fire-event ((sel selenium) locator event-name)
-  (request sel "fireEvent" locator event-name))
+(defun fire-event (locator event-name)
+  (request "fireEvent" locator event-name))
 
-(defmethod focus ((sel selenium) locator)
-  (request sel "focus" locator))
+(defun focus (locator)
+  (request "focus" locator))
 
-(defmethod key-press ((sel selenium) locator key-sequence)
-  (request sel "keyPress" locator key-sequence))
+(defun key-press (locator key-sequence)
+  (request "keyPress" locator key-sequence))
 
-(defmethod shift-key-down ((sel selenium))
-  (request sel "shiftKeyDown"))
+(defun shift-key-down ()
+  (request "shiftKeyDown"))
 
-(defmethod shift-key-up ((sel selenium))
-  (request sel "shiftKeyUp"))
+(defun shift-key-up ()
+  (request "shiftKeyUp"))
 
-(defmethod meta-key-down ((sel selenium))
-  (request sel "metaKeyDown"))
+(defun meta-key-down ()
+  (request "metaKeyDown"))
 
-(defmethod meta-key-up ((sel selenium))
-  (request sel "metaKeyUp"))
+(defun meta-key-up ()
+  (request "metaKeyUp"))
 
-(defmethod alt-key-down ((sel selenium))
-  (request sel "altKeyDown"))
+(defun alt-key-down ()
+  (request "altKeyDown"))
 
-(defmethod alt-key-up ((sel selenium))
-  (request sel "altKeyUp"))
+(defun alt-key-up ()
+  (request "altKeyUp"))
 
-(defmethod control-key-down ((sel selenium))
-  (request sel "controlKeyDown"))
+(defun control-key-down ()
+  (request "controlKeyDown"))
 
-(defmethod control-key-up ((sel selenium))
-  (request sel "controlKeyUp"))
+(defun control-key-up ()
+  (request "controlKeyUp"))
 
-(defmethod key-down ((sel selenium) locator key-sequence)
-  (request sel "keyDown" locator key-sequence))
+(defun key-down (locator key-sequence)
+  (request "keyDown" locator key-sequence))
 
-(defmethod key-up ((sel selenium) locator key-sequence)
-  (request sel "keyUp" locator key-sequence))
+(defun key-up (locator key-sequence)
+  (request "keyUp" locator key-sequence))
 
-(defmethod mouse-over ((sel selenium) locator)
-  (request sel "mouseOver" locator))
+(defun mouse-over (locator)
+  (request "mouseOver" locator))
 
-(defmethod mouse-out ((sel selenium) locator)
-  (request sel "mouseOut" locator))
+(defun mouse-out (locator)
+  (request "mouseOut" locator))
 
-(defmethod mouse-down ((sel selenium) locator)
-  (request sel "mouseDown" locator))
+(defun mouse-down (locator)
+  (request "mouseDown" locator))
 
-(defmethod mouse-down-right ((sel selenium) locator)
-  (request sel "mouseDownRight" locator))
+(defun mouse-down-right (locator)
+  (request "mouseDownRight" locator))
 
-(defmethod mouse-down-at ((sel selenium) locator coord)
-  (request sel "mouseDownAt" locator coord))
+(defun mouse-down-at (locator coord)
+  (request "mouseDownAt" locator coord))
 
-(defmethod mouse-down-right-at ((sel selenium) locator coord)
-  (request sel "mouseDownRightAt" locator coord))
+(defun mouse-down-right-at (locator coord)
+  (request "mouseDownRightAt" locator coord))
 
-(defmethod mouse-up ((sel selenium) locator)
-  (request sel "mouseUp" locator))
+(defun mouse-up (locator)
+  (request "mouseUp" locator))
 
-(defmethod mouse-up-right ((sel selenium) locator)
-  (request sel "mouseUpRight" locator))
+(defun mouse-up-right (locator)
+  (request "mouseUpRight" locator))
 
-(defmethod mouse-up-at ((sel selenium) locator coord)
-  (request sel "mouseUpAt" locator coord))
+(defun mouse-up-at (locator coord)
+  (request "mouseUpAt" locator coord))
 
-(defmethod mouse-up-right-at ((sel selenium) locator coord)
-  (request sel "mouseUpRightAt" locator coord))
+(defun mouse-up-right-at (locator coord)
+  (request "mouseUpRightAt" locator coord))
 
-(defmethod mouse-move ((sel selenium) locator)
-  (request sel "mouseMove" locator))
+(defun mouse-move (locator)
+  (request "mouseMove" locator))
 
-(defmethod mouse-move-at ((sel selenium) locator coord)
-  (request sel "mouseMoveAt" locator coord))
+(defun mouse-move-at (locator coord)
+  (request "mouseMoveAt" locator coord))
 
-(defmethod type-keys ((sel selenium) locator value)
-  (request sel "typeKeys" locator value))
+(defun type-keys (locator value)
+  (request "typeKeys" locator value))
 
-(defmethod set-speed ((sel selenium) value)
-  (request sel "setSpeed" value))
+(defun set-speed (value)
+  (request "setSpeed" value))
 
-(defmethod get-speed ((sel selenium))
-  (get-string sel "getSpeed"))
+(defun get-speed ()
+  (get-string "getSpeed"))
 
-(defmethod check ((sel selenium) locator)
-  (request sel "check" locator))
+(defun check (locator)
+  (request "check" locator))
 
-(defmethod uncheck ((sel selenium) locator)
-  (request sel "uncheck" locator))
+(defun uncheck (locator)
+  (request "uncheck" locator))
 
-(defmethod select ((sel selenium) select-locator option-locator)
-  (request sel "select" select-locator option-locator))
+(defun select (select-locator option-locator)
+  (request "select" select-locator option-locator))
 
-(defmethod add-selection ((sel selenium) locator option-locator)
-  (request sel "addSelection" locator option-locator))
+(defun add-selection (locator option-locator)
+  (request "addSelection" locator option-locator))
 
-(defmethod remove-selection ((sel selenium) locator option-locator)
-  (request sel "removeSelection" locator option-locator))
+(defun remove-selection (locator option-locator)
+  (request "removeSelection" locator option-locator))
 
-(defmethod remove-all-selections ((sel selenium) locator)
-  (request sel "removeAllSelections" locator))
+(defun remove-all-selections (locator)
+  (request "removeAllSelections" locator))
 
-(defmethod submit ((sel selenium) form-locator)
-  (request sel "submit" form-locator))
+(defun submit (form-locator)
+  (request "submit" form-locator))
 
-(defmethod open-window ((sel selenium) url window-id)
-  (request sel "openWindow" url window-id))
+(defun open-window (url window-id)
+  (request "openWindow" url window-id))
 
-(defmethod select-window ((sel selenium) window-id)
-  (request sel "selectWindow" window-id))
+(defun select-window (window-id)
+  (request "selectWindow" window-id))
 
-(defmethod select-pop-up ((sel selenium) window-id)
-  (request sel "selectPopUp" window-id))
+(defun select-pop-up (window-id)
+  (request "selectPopUp" window-id))
 
-(defmethod deselect-pop-up ((sel selenium))
-  (request sel "deselectPopUp"))
+(defun deselect-pop-up ()
+  (request "deselectPopUp"))
 
-(defmethod select-frame ((sel selenium) locator)
-  (request sel "selectFrame" locator))
+(defun select-frame (locator)
+  (request "selectFrame" locator))
 
-(defmethod wait-for-pop-up ((sel selenium) window-id timeout)
-  (request sel "waitForPopUp" window-id timeout))
+(defun wait-for-pop-up (window-id timeout)
+  (request "waitForPopUp" window-id timeout))
 
-(defmethod choose-cancel-on-next-confirmation ((sel selenium))
-  (request sel "chooseCancelOnNextConfirmation"))
+(defun choose-cancel-on-next-confirmation ()
+  (request "chooseCancelOnNextConfirmation"))
 
-(defmethod choose-ok-on-next-confirmation ((sel selenium))
-  (request sel "chooseOkOnNextConfirmation"))
+(defun choose-ok-on-next-confirmation ()
+  (request "chooseOkOnNextConfirmation"))
 
-(defmethod answer-on-next-prompt ((sel selenium) answer)
-  (request sel "answerOnNextPrompt" answer))
+(defun answer-on-next-prompt (answer)
+  (request "answerOnNextPrompt" answer))
 
-(defmethod go-back ((sel selenium))
-  (request sel "goBack"))
+(defun go-back ()
+  (request "goBack"))
 
-(defmethod refresh ((sel selenium))
-  (request sel "refresh"))
+(defun refresh ()
+  (request "refresh"))
 
-(defmethod close-pop-up ((sel selenium))
-  (request sel "close"))
+(defun close-pop-up ()
+  (request "close"))
 
-(defmethod alert-present? ((sel selenium))
-  (get-string sel "isAlertPresent"))
+(defun alert-present? ()
+  (get-string "isAlertPresent"))
 
-(defmethod prompt-present? ((sel selenium))
-  (get-string sel "isPromptPresent"))
+(defun prompt-present? ()
+  (get-string "isPromptPresent"))
 
-(defmethod confirmation-present? ((sel selenium))
-  (get-string sel "isConfirmationPresent"))
+(defun confirmation-present? ()
+  (get-string "isConfirmationPresent"))
 
-(defmethod get-alert ((sel selenium))
-  (get-string sel "getAlert"))
+(defun get-alert ()
+  (get-string "getAlert"))
 
-(defmethod get-confirmation ((sel selenium))
-  (get-string sel "getConfirmation"))
+(defun get-confirmation ()
+  (get-string "getConfirmation"))
 
-(defmethod get-prompt ((sel selenium))
-  (get-string sel "getPrompt"))
+(defun get-prompt ()
+  (get-string "getPrompt"))
 
-(defmethod get-location ((sel selenium))
-  (get-string sel "getLocation"))
+(defun get-location ()
+  (get-string "getLocation"))
 
-(defmethod get-title ((sel selenium))
-  (get-string sel "getTitle"))
+(defun get-title ()
+  (get-string "getTitle"))
 
-(defmethod get-body-text ((sel selenium))
-  (get-string sel "getBodyText"))
+(defun get-body-text ()
+  (get-string "getBodyText"))
 
-(defmethod get-value ((sel selenium) locator)
-  (get-string sel "getValue" locator))
+(defun get-value (locator)
+  (get-string "getValue" locator))
 
-(defmethod get-text ((sel selenium) locator)
-  (get-string sel "getText" locator))
+(defun get-text (locator)
+  (get-string "getText" locator))
 
-(defmethod highlight ((sel selenium) locator)
-  (request sel "highlight" locator))
+(defun highlight (locator)
+  (request "highlight" locator))
 
-(defmethod get-eval ((sel selenium) script)
-  (get-string sel "getEval" script))
+(defun get-eval (script)
+  (get-string "getEval" script))
 
-(defmethod checked? ((sel selenium) locator)
-  (get-string sel "isChecked" locator))
+(defun checked? (locator)
+  (get-string "isChecked" locator))
 
-(defmethod get-table ((sel selenium) table-cell-address)
-  (get-string sel "getTable" table-cell-address))
+(defun get-table (table-cell-address)
+  (get-string "getTable" table-cell-address))
 
-(defmethod get-selected-labels ((sel selenium) select-locator)
-  (split-string (get-string sel "getSelectedLabels" select-locator) :ch #\,))
+(defun get-selected-labels (select-locator)
+  (split-string (get-string "getSelectedLabels" select-locator) :ch #\,))
 
-(defmethod get-selected-label ((sel selenium) select-locator)
-  (get-string sel "getSelectedLabel" select-locator))
+(defun get-selected-label (select-locator)
+  (get-string "getSelectedLabel" select-locator))
 
-(defmethod get-selected-values ((sel selenium) select-locator)
-  (split-string (get-string sel "getSelectedValues" select-locator) :ch #\,))
+(defun get-selected-values (select-locator)
+  (split-string (get-string "getSelectedValues" select-locator) :ch #\,))
 
-(defmethod get-selected-value ((sel selenium) select-locator)
-  (get-string sel "getSelectedValue" select-locator))
+(defun get-selected-value (select-locator)
+  (get-string "getSelectedValue" select-locator))
 
-(defmethod get-selected-indexes ((sel selenium) select-locator)
-  (split-string (get-string sel "getSelectedIndexes" select-locator) :ch #\,))
+(defun get-selected-indexes (select-locator)
+  (split-string (get-string "getSelectedIndexes" select-locator) :ch #\,))
 
-(defmethod get-selected-index ((sel selenium) select-locator)
-  (get-string sel "getSelectedIndex" select-locator))
+(defun get-selected-index (select-locator)
+  (get-string "getSelectedIndex" select-locator))
  
-(defmethod get-selected-id ((sel selenium) select-locator)
-  (get-string sel "getSelectedId" select-locator))
+(defun get-selected-id (select-locator)
+  (get-string "getSelectedId" select-locator))
 
-(defmethod get-selected-ids ((sel selenium) select-locator)
-  (split-string (get-string sel "getSelectedIds" select-locator) :ch #\,))
+(defun get-selected-ids (select-locator)
+  (split-string (get-string "getSelectedIds" select-locator) :ch #\,))
 
-(defmethod something-selected? ((sel selenium) select-locator)
-  (get-string sel "isSomethingSelected" select-locator))
+(defun something-selected? (select-locator)
+  (get-string "isSomethingSelected" select-locator))
 
-(defmethod get-select-options ((sel selenium) select-locator)
-  (split-string (get-string sel "getSelectOptions" select-locator)))
+(defun get-select-options (select-locator)
+  (split-string (get-string "getSelectOptions" select-locator)))
 
-(defmethod get-attribute ((sel selenium) locator)
-  (get-string sel "getAttribute" locator))
+(defun get-attribute (locator)
+  (get-string "getAttribute" locator))
 
-(defmethod text-present? ((sel selenium) pattern)
-  (get-string sel "isTextPresent" pattern))
+(defun text-present? (pattern)
+  (get-string "isTextPresent" pattern))
 
-(defmethod element-present? ((sel selenium) locator)
-  (get-string sel "isElementPresent" locator))
+(defun element-present? (locator)
+  (get-string "isElementPresent" locator))
 
-(defmethod visible? ((sel selenium) locator)
-  (get-string sel "isVisible" locator))
+(defun visible? (locator)
+  (get-string "isVisible" locator))
 
-(defmethod editable? ((sel selenium) locator)
-  (get-string sel "isEditable" locator))
+(defun editable? (locator)
+  (get-string "isEditable" locator))
 
-(defmethod get-all-buttons ((sel selenium))
-  (split-string (get-string sel "getAllButtons") :ch #\,))
+(defun get-all-buttons ()
+  (split-string (get-string "getAllButtons") :ch #\,))
 
-(defmethod get-all-links ((sel selenium))
-  (split-string (get-string sel "getAllLinks") :ch #\,))
+(defun get-all-links ()
+  (split-string (get-string "getAllLinks") :ch #\,))
 
-(defmethod get-all-fields ((sel selenium))
-  (split-string (get-string sel "getAllFields") :ch #\,))
+(defun get-all-fields ()
+  (split-string (get-string "getAllFields") :ch #\,))
 
-(defmethod get-attribute-from-all-windows ((sel selenium) attribute)
-  (split-string (get-string sel "getAttributeFromAllWindows" attribute) :ch #\,))
+(defun get-attribute-from-all-windows (attribute)
+  (split-string (get-string "getAttributeFromAllWindows" attribute) :ch #\,))
 
-(defmethod dragdrop ((sel selenium) locator movementsString)
-  (request sel "dragdrop" locator movementsString))
+(defun dragdrop (locator movementsString)
+  (request "dragdrop" locator movementsString))
 
-(defmethod set-mouse-speed ((sel selenium) pixels)
-  (request sel "setMouseSpeed" pixels))
+(defun set-mouse-speed (pixels)
+  (request "setMouseSpeed" pixels))
 
-(defmethod get-mouse-speed ((sel selenium))
-  (get-string sel "getMouseSpeed"))
+(defun get-mouse-speed ()
+  (get-string "getMouseSpeed"))
 
-(defmethod drag-and-drop ((sel selenium) locator movementsString)
-  (request sel "dragAndDrop" locator movementsString))
+(defun drag-and-drop (locator movementsString)
+  (request "dragAndDrop" locator movementsString))
 
-(defmethod drag-and-drop-to-object ((sel selenium) locator-to-be-drag destination-locator)
-  (request sel "dragAndDropToObject" locator-to-be-drag destination-locator))
+(defun drag-and-drop-to-object (locator-to-be-drag destination-locator)
+  (request "dragAndDropToObject" locator-to-be-drag destination-locator))
 
-(defmethod window-focus ((sel selenium))
-  (request sel "windowFocus"))
+(defun window-focus ()
+  (request "windowFocus"))
 
-(defmethod window-maximize ((sel selenium))
-  (request sel "windowMaximize"))
+(defun window-maximize ()
+  (request "windowMaximize"))
 
-(defmethod get-all-window-ids ((sel selenium))
-  (split-string (get-string sel "getAllWindowIds") :ch #\,))
+(defun get-all-window-ids ()
+  (split-string (get-string "getAllWindowIds") :ch #\,))
 
-(defmethod get-all-window-names ((sel selenium))
-  (split-string (get-string sel "getAllWindowNames") :ch #\,))
+(defun get-all-window-names ()
+  (split-string (get-string "getAllWindowNames") :ch #\,))
 
-(defmethod get-all-window-titles ((sel selenium))
-  (split-string (get-string sel "getAllWindowTitles") :ch #\,))
+(defun get-all-window-titles ()
+  (split-string (get-string "getAllWindowTitles") :ch #\,))
 
-(defmethod get-html-source ((sel selenium))
-  (get-string sel "getHtmlsource"))
+(defun get-html-source ()
+  (get-string "getHtmlsource"))
 
-(defmethod set-cursor-position ((sel selenium) locator position)
-  (request sel "setCursorPosition" locator position))
+(defun set-cursor-position (locator position)
+  (request "setCursorPosition" locator position))
 
-(defmethod get-element-index ((sel selenium) locator)
-  (get-string sel "getElementIndex" locator))
+(defun get-element-index (locator)
+  (get-string "getElementIndex" locator))
 
-(defmethod ordered? ((sel selenium) locator1 locator2)
-  (get-string sel "isOrdered" locator1 locator2))
+(defun ordered? (locator1 locator2)
+  (get-string "isOrdered" locator1 locator2))
 
-(defmethod get-element-position-left ((sel selenium) locator)
-  (get-string sel "getElementPositionLeft" locator))
+(defun get-element-position-left (locator)
+  (get-string "getElementPositionLeft" locator))
 
-(defmethod get-element-position-top ((sel selenium) locator)
-  (get-string sel "getElementPositionTop" locator))
+(defun get-element-position-top (locator)
+  (get-string "getElementPositionTop" locator))
 
-(defmethod get-element-width ((sel selenium) locator)
-  (get-string sel "getElementWidth" locator))
+(defun get-element-width (locator)
+  (get-string "getElementWidth" locator))
 
-(defmethod get-element-height ((sel selenium) locator)
-  (get-string sel "getElementHeight" locator))
+(defun get-element-height (locator)
+  (get-string "getElementHeight" locator))
 
-(defmethod get-cursor-position ((sel selenium) locator)
-  (get-string sel "getCursorPosition" locator))
+(defun get-cursor-position (locator)
+  (get-string "getCursorPosition" locator))
 
-(defmethod get-expression ((sel selenium) exp)
-  (get-string sel "getExpression" exp))
+(defun get-expression (exp)
+  (get-string "getExpression" exp))
 
-(defmethod get-xpath-count ((sel selenium) xpath)
-  (get-string sel "getXpathCount" xpath))
+(defun get-xpath-count (xpath)
+  (get-string "getXpathCount" xpath))
 
-(defmethod assign-id ((sel selenium) locator identifier)
-  (request sel "assignId" locator identifier))
+(defun assign-id (locator identifier)
+  (request "assignId" locator identifier))
 
-(defmethod allow-native-xpath ((sel selenium) allow)
-  (request sel "allowNativeXpath" allow))
+(defun allow-native-xpath (allow)
+  (request "allowNativeXpath" allow))
 
-(defmethod ignore-attributes-without-value ((sel selenium) ignore)
-  (request sel "ignoreAttributesWithoutValue" ignore))
+(defun ignore-attributes-without-value (ignore)
+  (request "ignoreAttributesWithoutValue" ignore))
 
-(defmethod wait-for-condition ((sel selenium) script timeout)
-  (request sel "waitForCondition" script timeout))
+(defun wait-for-condition (script timeout)
+  (request "waitForCondition" script timeout))
 
-(defmethod set-timeout ((sel selenium) timeout)
-  (request sel "setTimeout" timeout))
+(defun set-timeout (timeout)
+  (request "setTimeout" timeout))
 
-(defmethod wait-for-frame-to-load ((sel selenium) frame-address timeout)
-  (request sel "waitForFrameToLoad" frame-address timeout))
+(defun wait-for-frame-to-load (frame-address timeout)
+  (request "waitForFrameToLoad" frame-address timeout))
 
-(defmethod get-cookie ((sel selenium))
-  (get-string sel "getCookie"))
+(defun get-cookie ()
+  (get-string "getCookie"))
 
-(defmethod get-cookie-by-name ((sel selenium) name)
-  (get-string sel "getCookieByName" name))
+(defun get-cookie-by-name (name)
+  (get-string "getCookieByName" name))
 
-(defmethod cookie-present? ((sel selenium) name)
-  (get-string sel "isCookiePresent" name))
+(defun cookie-present? (name)
+  (get-string "isCookiePresent" name))
 
-(defmethod create-cookie ((sel selenium) name-value-pair options)
-  (request sel "createCookie" name-value-pair options))
+(defun create-cookie (name-value-pair options)
+  (request "createCookie" name-value-pair options))
 
-(defmethod delete-cookie ((sel selenium) name options)
-  (request sel "deleteCookie" name options))
+(defun delete-cookie (name options)
+  (request "deleteCookie" name options))
 
-(defmethod delete-all-visible-cookies ((sel selenium))
-  (request sel "deleteAllVisibleCookies"))
+(defun delete-all-visible-cookies ()
+  (request "deleteAllVisibleCookies"))
 
-(defmethod set-browser-log-level ((sel selenium) log-level)
-  (request sel "setBrowserLogLevel" log-level))
+(defun set-browser-log-level (log-level)
+  (request "setBrowserLogLevel" log-level))
 
-(defmethod run-script ((sel selenium) script)
-  (request sel "runScript" script))
+(defun run-script (script)
+  (request "runScript" script))
 
-(defmethod add-location-strategy ((sel selenium) strategy-name function-definition)
-  (request sel "addLocationStrategy" strategy-name function-definition))
+(defun add-location-strategy (strategy-name function-definition)
+  (request "addLocationStrategy" strategy-name function-definition))
 
-(defmethod capture-page-screenshot ((sel selenium) filename args)
-  (request sel "captureEntirePageScreenshot" filename args))
+(defun capture-page-screenshot (filename args)
+  (request "captureEntirePageScreenshot" filename args))
 
-(defmethod rollup ((sel selenium) rollup-name args)
-  (request sel "rollup" rollup-name args))
+(defun rollup (rollup-name args)
+  (request "rollup" rollup-name args))
 
-(defmethod add-script ((sel selenium) script-content &optional script-tag-id)
-  (request sel "addScript" script-content script-tag-id))
+(defun add-script (script-content &optional script-tag-id)
+  (request "addScript" script-content script-tag-id))
 
-(defmethod remove-script ((sel selenium) script-tag-id)
-  (request sel "removeScript" script-tag-id))
+(defun remove-script (script-tag-id)
+  (request "removeScript" script-tag-id))
 
-(defmethod use-xpath-library ((sel selenium) library-name)
-  (request sel "useXpathLibrary" library-name))
+(defun use-xpath-library (library-name)
+  (request "useXpathLibrary" library-name))
 
-(defmethod set-context ((sel selenium) context)
-  (request sel "setContext" context))
+(defun set-context (context)
+  (request "setContext" context))
 
-(defmethod attach-file ((sel selenium) field-locator file-locator)
-  (request sel "attachFile" field-locator file-locator))
+(defun attach-file (field-locator file-locator)
+  (request "attachFile" field-locator file-locator))
 
-(defmethod capture-screenshot ((sel selenium) filename)
-  (request sel "captureScreenshot" filename))
+(defun capture-screenshot (filename)
+  (request "captureScreenshot" filename))
 
-(defmethod capture-screenshot-to-string ((sel selenium))
-  (get-string sel "captureScreenshotToString"))
+(defun capture-screenshot-to-string ()
+  (get-string "captureScreenshotToString"))
 
-(defmethod capture-network-traffic ((sel selenium) traffic-type)
-  (get-string sel "captureNetworkTraffic" traffic-type))
+(defun capture-network-traffic (traffic-type)
+  (get-string "captureNetworkTraffic" traffic-type))
 
-(defmethod add-custom-request-header ((sel selenium) key value)
-  (request sel "addCustomRequestHeader" key value))
+(defun add-custom-request-header (key value)
+  (request "addCustomRequestHeader" key value))
 
-(defmethod capture-page-screenshot-to-string ((sel selenium) args)
-  (get-string sel "captureEntirePageScreenshotToString" args))
+(defun capture-page-screenshot-to-string (args)
+  (get-string "captureEntirePageScreenshotToString" args))
 
-(defmethod shutdown-selenium-server ((sel selenium))
-  (request sel "shutDownSeleniumServer"))
+(defun shutdown-selenium-server ()
+  (request "shutDownSeleniumServer"))
 
-(defmethod retrieve-last-remote-control-logs ((sel selenium))
-  (get-string sel "retrieveLastRemoteControlLogs"))
+(defun retrieve-last-remote-control-logs ()
+  (get-string "retrieveLastRemoteControlLogs"))
 
-(defmethod key-down-native ((sel selenium) keycode)
-  (request sel "keyDownNative" keycode))
+(defun key-down-native (keycode)
+  (request "keyDownNative" keycode))
 
-(defmethod key-up-native ((sel selenium) keycode)
-  (request sel "keyUpNative" keycode))
+(defun key-up-native (keycode)
+  (request "keyUpNative" keycode))
 
-(defmethod key-press-native ((sel selenium) keycode)
-  (request sel "keyPressNative" keycode))
+(defun key-press-native (keycode)
+  (request "keyPressNative" keycode))
 
 (defun start-test ()
   (let ((selenium1 (make-instance 'selenium
