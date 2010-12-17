@@ -55,9 +55,10 @@
 ;macro here?
 ;dont think so... but how else can i ?
 (defmacro get-string (verb &body args)
-  `(let ((response (request ,verb
-			    ,@args)))
-     (subseq response 3)))
+  (let ((ressym (gensym)))
+    `(let ((response (,ressym ,verb
+			      ,@args)))
+       (subseq response 3))))
 
 (defun session-setup (&key host port browser url ext-js)
   (setf *selenium-host* host
