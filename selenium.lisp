@@ -58,7 +58,7 @@
   (let ((ressym (gensym)))
     `(let ((,ressym (request ,verb
 			     ,@args)))
-       (subseq response 3))))
+       (subseq ,ressym 3))))
 
 (defun session-setup (&key host port browser url ext-js)
   (setf *selenium-host* host
